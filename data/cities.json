@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "source": "open-meteo-archive",
+  "startDate": "2024-01-01",
+  "endDate": "2024-12-31",
+  "cities": [
+    {
+      "id": "bristol",
+      "label": "Bristol",
+      "latitude": 51.45,
+      "longitude": -2.59,
+      "timezone": "Europe/London",
+      "file": "bristol.series.json"
+    },
+    {
+      "id": "ljubljana",
+      "label": "Ljubljana",
+      "latitude": 46.05,
+      "longitude": 14.51,
+      "timezone": "Europe/Ljubljana",
+      "file": "ljubljana.series.json"
+    },
+    {
+      "id": "nice",
+      "label": "Nice",
+      "latitude": 43.7,
+      "longitude": 7.27,
+      "timezone": "Europe/Paris",
+      "file": "nice.series.json"
+    },
+    {
+      "id": "reykjavik",
+      "label": "Reykjavik",
+      "latitude": 64.15,
+      "longitude": -21.95,
+      "timezone": "Atlantic/Reykjavik",
+      "file": "reykjavik.series.json"
+    }
+  ]
+}
