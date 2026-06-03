@@ -1,0 +1,44 @@
+[package]
+name = "weather-engine"
+version = "0.1.0"
+edition = "2021"
+description = "Weather spiral engine — canonical state, view-model patches, CBOR wire protocol"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+enum_glob_use = "allow"
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+must_use_candidate = "allow"
+doc_markdown = "allow"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+typegen = ["dep:ts-rs", "engine-kernel/typegen"]
+[[bin]]
+name = "export-types"
+path = "src/bin/export-types.rs"
+required-features = ["typegen"]
+
+[dependencies]
+ciborium = "0.2"
+engine-kernel = { path = "../../engine-shell/rust/engine-kernel" }
+serde = { version = "1", features = ["derive"] }
+serde_bytes = "0.11"
+ts-rs = { version = "10", optional = true }
+wasm-bindgen = "0.2"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[profile.release]
+opt-level = "s"
+lto = true
