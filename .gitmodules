@@ -1,0 +1,3 @@
+[submodule "engine-shell"]
+	path = engine-shell
+	url = git@github.com:davidgtonge/engine-shell.git

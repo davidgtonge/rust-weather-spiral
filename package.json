@@ -4,17 +4,32 @@
   "description": "Weather spiral demo — Rust/Wasm engine, Open-Meteo data, canvas blit",
   "type": "module",
   "scripts": {
+    "fetch:weather": "node scripts/fetch-open-meteo.mjs && npm run build:weather-cbor",
+    "build:weather-cbor": "node scripts/build-weather-cbor.mjs",
+    "validate:data": "node scripts/validate-data.mjs",
+    "validate:cbor": "node scripts/validate-cbor.mjs",
+    "predev": "npm run build:weather-cbor && npm run generate:types && npm run build:wasm",
+    "prebuild": "npm run build:weather-cbor && npm run generate:types && npm run build:wasm",
+    "generate:types": "cargo run --manifest-path rust/weather-engine/Cargo.toml --features typegen --bin export-types",
+    "build:wasm": "wasm-pack build rust/weather-engine --target web --out-dir ../../pkg",
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:rust": "cargo test --manifest-path rust/weather-engine/Cargo.toml",
+    "clippy": "cargo clippy --manifest-path rust/weather-engine/Cargo.toml --all-targets --features typegen -- -D warnings",
+    "typecheck": "tsc -b"
   },
   "license": "MIT",
   "dependencies": {
+    "@dtonge/engine-shell": "file:./engine-shell/ts",
+    "cbor-x": "^1.6.0",
     "preact": "^10.27.2"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.2",
     "typescript": "^6.0.3",
-    "vite": "^8.0.16"
+    "vite": "^8.0.16",
+    "vitest": "^3.2.6"
   }
 }
