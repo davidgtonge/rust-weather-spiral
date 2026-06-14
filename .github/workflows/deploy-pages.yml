@@ -38,7 +38,9 @@ jobs:
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm ci
+          npm install --no-save @rolldown/binding-linux-x64-gnu@1.0.3
 
       - name: Build site
         run: npm run build
