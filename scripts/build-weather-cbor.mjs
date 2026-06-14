@@ -11,7 +11,7 @@
  */
 
 import { encode } from "cbor-x";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { access, readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -33,8 +33,28 @@ function valuesToF32Bytes(pairs) {
 }
 
 async function main() {
+  const bundlePath = join(DATA_DIR, "weather.bundle.cbor");
   const manifestRaw = await readFile(join(DATA_DIR, "cities.json"), "utf8");
   const manifest = JSON.parse(manifestRaw);
+
+  const firstSeries = manifest.cities[0]?.file;
+  if (firstSeries) {
+    try {
+      await access(join(DATA_DIR, firstSeries));
+    } catch {
+      try {
+        await access(bundlePath);
+        console.log(
+          `Skipping CBOR rebuild — no ${firstSeries}; using committed ${bundlePath}`,
+        );
+        return;
+      } catch {
+        throw new Error(
+          `Missing ${firstSeries} and no ${bundlePath}. Run npm run fetch:weather.`,
+        );
+      }
+    }
+  }
 
   /** @type {Record<string, unknown>[]} */
   const cities = [];
@@ -71,7 +91,7 @@ async function main() {
     cities,
   };
 
-  const outPath = join(DATA_DIR, "weather.bundle.cbor");
+  const outPath = bundlePath;
   const bytes = encode(bundle);
   await mkdir(DATA_DIR, { recursive: true });
   await writeFile(outPath, bytes);

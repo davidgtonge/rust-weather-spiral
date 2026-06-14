@@ -4,6 +4,8 @@ Weather spiral demo — Rust/Wasm engine, Open-Meteo offline data, canvas blit.
 
 > **Weather Spiral: visualising seasonal weather with Rust, Wasm, CBOR, and canvas**
 
+**Live demo:** https://davidgtonge.github.io/rust-weather-spiral/
+
 ## Quick start
 
 ```bash
