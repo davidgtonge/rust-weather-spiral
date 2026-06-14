@@ -13,6 +13,7 @@ import {
   type WeatherUpdate,
 } from "../worker/weather-client";
 import { emptyViewModel } from "./empty-view-model";
+import { loadWeatherBundle } from "../data/load-weather-bundle";
 
 const TRANSITION_EVENTS = new Set(["citySelected", "metricSelected", "zoomSelected"]);
 
@@ -66,7 +67,11 @@ export function useWeatherSpiral() {
   });
 
   useEffect(() => {
-    void init(weatherInitInput());
+    void loadWeatherBundle()
+      .then((bundle) => init(weatherInitInput(bundle)))
+      .catch((err: unknown) => {
+        console.error("weather bundle load failed", err);
+      });
   }, [init]);
 
   useEffect(() => {

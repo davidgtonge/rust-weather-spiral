@@ -12,17 +12,21 @@ Weather spiral demo — Rust/Wasm engine, Open-Meteo offline data, canvas blit.
 git clone --recurse-submodules https://github.com/davidgtonge/rust-weather-spiral.git
 cd rust-weather-spiral
 npm install
-npm run dev      # http://localhost:5173 — Vite + Wasm worker
+npm run dev      # http://localhost:5174 — Vite + Wasm worker
 npm run build    # production bundle
 npm run test:rust
+npm run clippy   # Rust lints (warnings denied)
 ```
 
-Weather series ship as **`weather.bundle.cbor`** (~0.7 MB dense f32 blobs) embedded in Wasm. The worker draws 8,784 segments at 1024² via OffscreenCanvas 2D (~15–20 ms).
+Weather series ship as **`data/weather.bundle.cbor`** (~0.7 MB dense f32 blobs), fetched at runtime and passed to the engine on `init`. The Wasm binary is ~270 KB (geometry + CBOR protocol only). The worker draws 8,784 segments at 1024² via OffscreenCanvas 2D (~15–20 ms).
 
 ## Architecture
 
 ```txt
-Preact UI → CBOR worker → Rust/Wasm (weather-engine)
+Preact UI
+  → fetch weather.bundle.cbor
+  → CBOR worker → Rust/Wasm (weather-engine)
+      init { weatherBundle } → parse cities once
   → view-model patches + compact geometry wire
   → worker OffscreenCanvas 2D → ImageBitmap blit
 ```
@@ -35,18 +39,18 @@ The repo includes a pre-built **`data/weather.bundle.cbor`**. Hourly JSON source
 
 ```bash
 npm run fetch:weather       # download Open-Meteo JSON + rebuild CBOR bundle
-npm run build:weather-cbor  # JSON → weather.bundle.cbor (Wasm embed)
+npm run build:weather-cbor  # JSON → weather.bundle.cbor
 npm run validate:data       # smoke test JSON (after fetch)
 npm run validate:cbor       # smoke test bundle
 ```
 
-Cities: Bristol, Ljubljana, Nice, Reykjavik. The CBOR bundle is `include_bytes!` in the Wasm binary (one decode; f32 arrays as dense byte blobs).
+Cities: Bristol, Ljubljana, Nice, Reykjavik. Vite emits the bundle as a static asset; `src/data/load-weather-bundle.ts` fetches it and the worker sends the bytes on `WorkerInput.init`. Rust decodes once into in-memory f32 metric blobs.
 
 ## Engine modules
 
 ```txt
 rust/weather-engine/src/
-  data.rs      # load embedded CBOR bundle
+  data.rs      # parse runtime CBOR bundle
   spiral.rs    # layout (port of react-spiral)
   colour.rs    # per-metric palettes
   geometry.rs  # segment wire for Canvas2D

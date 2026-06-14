@@ -1,3 +1,4 @@
+use crate::num::{f32_from_u32, u32_from_f32_rounded};
 use crate::state::Zoom;
 
 #[derive(Debug, Clone, Copy)]
@@ -27,14 +28,14 @@ pub fn layout_ctx(
     zoom: Zoom,
 ) -> LayoutCtx {
     let (rotations, offset, _, _) = zoom_layout(zoom);
-    let scale = canvas_size as f32 / 750.0;
-    let origin = canvas_size as f32 / 2.0 - 30.0 * scale;
+    let scale = f32_from_u32(canvas_size) / 750.0;
+    let origin = f32_from_u32(canvas_size) / 2.0 - 30.0 * scale;
     let offset = offset * scale;
 
-    let extent_start = start_unix as f32;
+    let extent_start = f32_from_u32(start_unix);
     let extent_end =
-        start_unix as f32 + (hour_count.saturating_sub(1) as f32) * hour_step as f32;
-    let period = (extent_end - extent_start) / rotations as f32;
+        f32_from_u32(start_unix) + f32_from_u32(hour_count.saturating_sub(1)) * f32_from_u32(hour_step);
+    let period = (extent_end - extent_start) / f32_from_u32(rotations);
 
     LayoutCtx {
         origin,
@@ -48,7 +49,7 @@ pub fn layout_ctx(
 
 #[inline]
 pub fn layout_point(ctx: &LayoutCtx, hour_step: u32, index: u32) -> (f32, f32, f32) {
-    let t = ctx.extent_start + index as f32 * hour_step as f32;
+    let t = ctx.extent_start + f32_from_u32(index) * f32_from_u32(hour_step);
     let radius_t = (t - ctx.extent_start) / (ctx.extent_end - ctx.extent_start);
     let r = ctx.inner_min + radius_t * (ctx.inner_max - ctx.inner_min);
     let angle_t = (t - ctx.extent_start) / ctx.period;
@@ -62,14 +63,14 @@ pub fn layout_point(ctx: &LayoutCtx, hour_step: u32, index: u32) -> (f32, f32, f
 
 pub fn layout_segment_size(canvas_size: u32, zoom: Zoom) -> (f32, f32) {
     let (_, _, segment_w, segment_h) = zoom_layout(zoom);
-    let scale = canvas_size as f32 / 750.0;
+    let scale = f32_from_u32(canvas_size) / 750.0;
     (segment_w * scale, segment_h * scale)
 }
 
 /// Tapestry segments are smaller than metric bricks — room for radial overlays on the spiral.
 pub fn tapestry_segment_size(canvas_size: u32, zoom: Zoom) -> (f32, f32) {
-    let (seg_w, seg_h) = layout_segment_size(canvas_size, zoom);
     const SCALE: f32 = 0.36;
+    let (seg_w, seg_h) = layout_segment_size(canvas_size, zoom);
     (seg_w * SCALE, seg_h * SCALE)
 }
 
@@ -82,7 +83,7 @@ const DAYLIGHT_GLOW_MAX: f32 = 10.0;
 
 /// Small segments for dense ring views (mandala / fingerprint / daylight).
 pub fn ring_segment_size(canvas_size: u32) -> (f32, f32) {
-    let scale = canvas_size as f32 / 750.0;
+    let scale = f32_from_u32(canvas_size) / 750.0;
     (5.5 * scale, 3.5 * scale)
 }
 
@@ -100,7 +101,7 @@ pub fn ring_overlay_scale(seg_w: f32, daylight: bool) -> (f32, f32) {
 /// Padding from canvas edge when the outer ring anchor is at `outer` radius from centre.
 /// Glow is a circle around the anchor, so it must be counted separately from radial spokes.
 pub fn ring_edge_pad(seg_w: f32, seg_h: f32, canvas_size: u32, daylight: bool) -> f32 {
-    let scale = canvas_size as f32 / 750.0;
+    let scale = f32_from_u32(canvas_size) / 750.0;
     let (extent, glow) = ring_overlay_scale(seg_w, daylight);
     let corner = (seg_w * seg_w + seg_h * seg_h).sqrt();
     let radial = seg_w * (0.5 + 1.4 * extent);
@@ -109,7 +110,7 @@ pub fn ring_edge_pad(seg_w: f32, seg_h: f32, canvas_size: u32, daylight: bool) -
 
 /// Padding from canvas edge for anchor + rotated segment + capped overlays.
 pub fn tapestry_edge_pad(seg_w: f32, seg_h: f32, canvas_size: u32) -> f32 {
-    let scale = canvas_size as f32 / 750.0;
+    let scale = f32_from_u32(canvas_size) / 750.0;
     let extent = (TAPESTRY_OVERLAY_EXTENT_CAP / seg_w.max(1.0)).min(1.0);
     let glow = (seg_w * 0.55).min(TAPESTRY_OVERLAY_GLOW_MAX);
     let corner = (seg_w * seg_w + seg_h * seg_h).sqrt();
@@ -127,9 +128,9 @@ pub fn tapestry_layout_ctx(
 ) -> LayoutCtx {
     let mut ctx = layout_ctx(hour_count, start_unix, hour_step, canvas_size, zoom);
     let (seg_w, seg_h) = tapestry_segment_size(canvas_size, zoom);
-    let center = canvas_size as f32 * 0.5;
+    let center = f32_from_u32(canvas_size) * 0.5;
     let edge_pad = tapestry_edge_pad(seg_w, seg_h, canvas_size);
-    let radial_span = (ctx.inner_max - ctx.inner_min).max(40.0 * (canvas_size as f32 / 750.0));
+    let radial_span = (ctx.inner_max - ctx.inner_min).max(40.0 * (f32_from_u32(canvas_size) / 750.0));
     let max_radius = (center - edge_pad).max(edge_pad);
     ctx.origin = center;
     ctx.inner_max = max_radius;
@@ -164,8 +165,8 @@ fn radial_ring_layout(
     // Largest hour index that maps to the outer edge (23 for `hour / 24` layouts).
     max_hour_index: f32,
 ) -> RadialRingLayout {
-    let cx = canvas_size as f32 * 0.5;
-    let cy = canvas_size as f32 * 0.5;
+    let cx = f32_from_u32(canvas_size) * 0.5;
+    let cy = f32_from_u32(canvas_size) * 0.5;
     let (seg_w, seg_h) = ring_segment_size(canvas_size);
     let margin = ring_edge_pad(seg_w, seg_h, canvas_size, daylight);
     let max_anchor = cx.min(cy) - margin;
@@ -228,17 +229,54 @@ pub fn mandala_point(
     start_unix: f32,
     hour_step: u32,
 ) -> (f32, f32, f32) {
-    let hours_from_start = ((unix_t - start_unix) / hour_step as f32).max(0.0);
+    let hours_from_start = ((unix_t - start_unix) / f32_from_u32(hour_step)).max(0.0);
     let day = (hours_from_start / 24.0).floor();
     let hour_of_day = hours_from_start % 24.0;
 
-    let month = ((day / 30.4).floor() as u32).min(11);
+    let month = u32_from_f32_rounded((day / 30.4).floor()).min(11);
     let day_in_month = day % 30.4;
     let month_fraction = (day_in_month / 30.4).clamp(0.0, 0.999);
 
     let sector = std::f32::consts::TAU / 12.0;
     let hour_spread = (hour_of_day / 24.0) * sector * 0.04;
-    let angle = month as f32 * sector + month_fraction * sector * 0.94 + hour_spread;
+    let angle = f32_from_u32(month) * sector + month_fraction * sector * 0.94 + hour_spread;
+    let radius = layout.inner + (hour_of_day / 24.0) * (layout.outer - layout.inner);
+    (
+        layout.cx + radius * angle.cos(),
+        layout.cy + radius * angle.sin(),
+        angle,
+    )
+}
+
+/// Sunprint: angle = day of year, radius = position within that day's lit hours only.
+pub fn daylight_point(
+    layout: &FingerprintLayout,
+    day: f32,
+    hour_of_day: f32,
+    window: crate::daylight::DayWindow,
+) -> (f32, f32, f32) {
+    let angle = (day / DAYS_PER_YEAR) * std::f32::consts::TAU;
+    let span = f32_from_u32(window.last_hour - window.first_hour + 1);
+    let t = ((hour_of_day - f32_from_u32(window.first_hour)) + 0.5) / span;
+    let radius = layout.inner + t.clamp(0.0, 1.0) * (layout.outer - layout.inner);
+    (
+        layout.cx + radius * angle.cos(),
+        layout.cy + radius * angle.sin(),
+        angle,
+    )
+}
+
+/// Circular year calendar: angle = day of year, radius = hour of day.
+pub fn fingerprint_point(
+    layout: &FingerprintLayout,
+    unix_t: f32,
+    start_unix: f32,
+    hour_step: u32,
+) -> (f32, f32, f32) {
+    let hours_from_start = ((unix_t - start_unix) / f32_from_u32(hour_step)).max(0.0);
+    let day = (hours_from_start / 24.0).floor();
+    let hour_of_day = hours_from_start % 24.0;
+    let angle = (day / DAYS_PER_YEAR) * std::f32::consts::TAU;
     let radius = layout.inner + (hour_of_day / 24.0) * (layout.outer - layout.inner);
     (
         layout.cx + radius * angle.cos(),
@@ -303,8 +341,8 @@ mod tests {
     }
 
     fn assert_ring_fills_canvas(outer: f32, canvas: u32) {
-        let half = canvas as f32 * 0.5;
         const MIN_FILL: f32 = 0.95;
+        let half = f32_from_u32(canvas) * 0.5;
         assert!(
             outer / half >= MIN_FILL,
             "ring outer {outer} fills only {:.0}% of half-canvas (need {:.0}%)",
@@ -336,8 +374,8 @@ mod tests {
         assert!(
             min_x >= margin
                 && min_y >= margin
-                && max_x <= canvas as f32 - margin
-                && max_y <= canvas as f32 - margin,
+                && max_x <= f32_from_u32(canvas) - margin
+                && max_y <= f32_from_u32(canvas) - margin,
             "{label} bbox [{min_x},{min_y}]-[{max_x},{max_y}] outside {canvas}"
         );
     }
@@ -350,7 +388,7 @@ mod tests {
         let extent = (TAPESTRY_OVERLAY_EXTENT_CAP / seg_w.max(1.0)).min(1.0);
         let glow = (seg_w * 0.55).min(TAPESTRY_OVERLAY_GLOW_MAX);
         let radial_overlay = seg_w * (0.55 + 1.4 * extent) + glow;
-        let center = canvas as f32 * 0.5;
+        let center = f32_from_u32(canvas) * 0.5;
 
         for i in 0..hour_count {
             let (x, y, angle) = layout_point(&ctx, hour_step, i);
@@ -361,23 +399,23 @@ mod tests {
             // Overlays extend along local +x (radial outward from spiral centre).
             let outward_x = cos;
             let outward_y = sin;
-            let max_xo = max_x + radial_overlay * outward_x.max(0.0);
-            let max_yo = max_y + radial_overlay * outward_y.max(0.0);
-            let min_xo = min_x + radial_overlay * outward_x.min(0.0);
-            let min_yo = min_y + radial_overlay * outward_y.min(0.0);
+            let xmax_overlay = max_x + radial_overlay * outward_x.max(0.0);
+            let ymax_overlay = max_y + radial_overlay * outward_y.max(0.0);
+            let xmin_overlay = min_x + radial_overlay * outward_x.min(0.0);
+            let ymin_overlay = min_y + radial_overlay * outward_y.min(0.0);
 
             assert!(
                 min_x >= margin
                     && min_y >= margin
-                    && max_x <= canvas as f32 - margin
-                    && max_y <= canvas as f32 - margin,
+                    && max_x <= f32_from_u32(canvas) - margin
+                    && max_y <= f32_from_u32(canvas) - margin,
                 "tapestry segment {i} bbox [{min_x},{min_y}]-[{max_x},{max_y}] outside {canvas} (zoom {zoom:?})"
             );
             assert!(
-                min_xo >= margin
-                    && min_yo >= margin
-                    && max_xo <= canvas as f32 - margin
-                    && max_yo <= canvas as f32 - margin,
+                xmin_overlay >= margin
+                    && ymin_overlay >= margin
+                    && xmax_overlay <= f32_from_u32(canvas) - margin
+                    && ymax_overlay <= f32_from_u32(canvas) - margin,
                 "tapestry segment {i} with overlays outside {canvas} (zoom {zoom:?}, centre {center})"
             );
         }
@@ -404,8 +442,8 @@ mod tests {
         let hour_count = 8784u32;
 
         for i in 0..hour_count {
-            let t = start as f32 + i as f32 * hour_step as f32;
-            let (x, y, angle) = fingerprint_point(&layout, t, start as f32, hour_step);
+            let t = f32_from_u32(start) + f32_from_u32(i) * f32_from_u32(hour_step);
+            let (x, y, angle) = fingerprint_point(&layout, t, f32_from_u32(start), hour_step);
             assert_ring_point_fits(
                 x,
                 y,
@@ -429,8 +467,8 @@ mod tests {
         let hour_count = 8784u32;
 
         for i in 0..hour_count {
-            let t = start as f32 + i as f32 * hour_step as f32;
-            let (x, y, angle) = mandala_point(&layout, t, start as f32, hour_step);
+            let t = f32_from_u32(start) + f32_from_u32(i) * f32_from_u32(hour_step);
+            let (x, y, angle) = mandala_point(&layout, t, f32_from_u32(start), hour_step);
             assert_ring_point_fits(
                 x,
                 y,
@@ -451,42 +489,5 @@ mod tests {
 
         assert!(layout.outer > layout.inner);
     }
-}
-
-/// Sunprint: angle = day of year, radius = position within that day's lit hours only.
-pub fn daylight_point(
-    layout: &FingerprintLayout,
-    day: f32,
-    hour_of_day: f32,
-    window: crate::daylight::DayWindow,
-) -> (f32, f32, f32) {
-    let angle = (day / DAYS_PER_YEAR) * std::f32::consts::TAU;
-    let span = (window.last_hour - window.first_hour + 1) as f32;
-    let t = ((hour_of_day - window.first_hour as f32) + 0.5) / span;
-    let radius = layout.inner + t.clamp(0.0, 1.0) * (layout.outer - layout.inner);
-    (
-        layout.cx + radius * angle.cos(),
-        layout.cy + radius * angle.sin(),
-        angle,
-    )
-}
-
-/// Circular year calendar: angle = day of year, radius = hour of day.
-pub fn fingerprint_point(
-    layout: &FingerprintLayout,
-    unix_t: f32,
-    start_unix: f32,
-    hour_step: u32,
-) -> (f32, f32, f32) {
-    let hours_from_start = ((unix_t - start_unix) / hour_step as f32).max(0.0);
-    let day = (hours_from_start / 24.0).floor();
-    let hour_of_day = hours_from_start % 24.0;
-    let angle = (day / DAYS_PER_YEAR) * std::f32::consts::TAU;
-    let radius = layout.inner + (hour_of_day / 24.0) * (layout.outer - layout.inner);
-    (
-        layout.cx + radius * angle.cos(),
-        layout.cy + radius * angle.sin(),
-        angle,
-    )
 }
 

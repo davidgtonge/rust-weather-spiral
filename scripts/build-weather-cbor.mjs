@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Compile human-readable JSON series into a compact Wasm-ready CBOR bundle.
+ * Compile human-readable JSON series into a compact runtime CBOR bundle.
  *
  * Wire shape (one decode in Rust):
  *   { version, hourStep, cities: [{ id, label, startUnix, hourCount,

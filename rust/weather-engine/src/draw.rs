@@ -1,6 +1,7 @@
 //! Canvas draw-command wire — Rust owns layout and overlay geometry; TS executes ops.
 
 use crate::colour::Rgba;
+use crate::num::{u32_from_usize, u8_from_alpha, u8_from_f32_rounded};
 use crate::spiral::{ring_overlay_scale, TAPESTRY_OVERLAY_EXTENT_CAP, TAPESTRY_OVERLAY_GLOW_MAX};
 use crate::view_mode::ViewMode;
 
@@ -90,7 +91,7 @@ impl DrawWriter {
         canvas_w: f32,
         canvas_h: f32,
     ) -> Vec<u8> {
-        let count = self.command_count() as u32;
+        let count = u32_from_usize(self.command_count());
         self.out[0..4].copy_from_slice(&count.to_le_bytes());
         self.out[4..8].copy_from_slice(&canvas_w.to_le_bytes());
         self.out[8..12].copy_from_slice(&canvas_h.to_le_bytes());
@@ -124,14 +125,14 @@ fn rgba_f32(r: u8, g: u8, b: u8, alpha: f32) -> Rgba {
         r,
         g,
         b,
-        a: (alpha.clamp(0.0, 1.0) * 255.0).round() as u8,
+        a: u8_from_alpha(alpha),
     }
 }
 
 fn lerp_u8(t: f32, a: u8, b: u8) -> u8 {
     let af = f32::from(a);
     let bf = f32::from(b);
-    (af + (bf - af) * t).round() as u8
+    u8_from_f32_rounded(af + (bf - af) * t)
 }
 
 /// Glyph temperature strip — matches former `temperatureRgb()` in TS.
@@ -165,8 +166,8 @@ fn overlay_scale(view_mode: ViewMode, seg_w: f32) -> (f32, f32) {
     match view_mode {
         ViewMode::Daylight => ring_overlay_scale(seg_w, true),
         ViewMode::Mandala | ViewMode::Fingerprint => ring_overlay_scale(seg_w, false),
-        ViewMode::Tapestry => tapestry_overlay_scale(seg_w),
-        _ => tapestry_overlay_scale(seg_w),
+        ViewMode::Tapestry | ViewMode::Metric | ViewMode::Ribbon | ViewMode::Condition
+        | ViewMode::Glyphs => tapestry_overlay_scale(seg_w),
     }
 }
 

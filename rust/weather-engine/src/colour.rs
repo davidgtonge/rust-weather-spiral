@@ -1,3 +1,4 @@
+use crate::num::u8_from_f32_rounded;
 use crate::state::Metric;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -60,7 +61,7 @@ fn diverging_temp(t: f32) -> Rgba {
 fn lerp_u8(t: f32, a: u8, b: u8) -> u8 {
     let af = f32::from(a);
     let bf = f32::from(b);
-    (af + (bf - af) * t).round() as u8
+    u8_from_f32_rounded(af + (bf - af) * t)
 }
 
 pub fn lerp_rgb(t: f32, low: (u8, u8, u8), high: (u8, u8, u8)) -> (u8, u8, u8) {

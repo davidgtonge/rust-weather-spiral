@@ -20,7 +20,7 @@ export type EffectCommand = { "type": "renderSpiral", width: number, height: num
 
 export type ViewModel = { cityLabel: string, metricLabel: string, zoomLabel: string, viewModeLabel: string, viewModeDescription: string, cities: Array<CityOption>, selectedCityId: string, selectedMetric: Metric, selectedZoom: Zoom, selectedViewMode: ViewMode, frameWidth: number, frameHeight: number, colorDomainMin: number, colorDomainMax: number, colorUnit: string, loading: boolean, showMetricTabs: boolean, };
 
-export type WorkerInput = { "kind": "init" } | { "kind": "event", event: AppEvent, };
+export type WorkerInput = { "kind": "init", weatherBundle: Uint8Array, } | { "kind": "event", event: AppEvent, };
 
 export type WorkerOutput = { "kind": "initialized", viewModel: ViewModel, effects: Array<EffectCommand>, } | { "kind": "response", patches: Array<ViewModelPatch>, effects: Array<EffectCommand>, diagnostics: Array<string>, } | { "kind": "error", message: string, };
 

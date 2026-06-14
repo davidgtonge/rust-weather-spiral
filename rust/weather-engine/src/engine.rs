@@ -1,6 +1,6 @@
 use engine_kernel::diff_serializable_checked;
 
-use crate::data::load_embedded_cities;
+use crate::data::load_cities_from_bundle;
 use crate::effect::EffectCommand;
 use crate::geometry::build_geometry_wire;
 use crate::protocol::{WorkerInput, WorkerOutput};
@@ -28,8 +28,8 @@ impl Engine {
 
     pub fn dispatch(&mut self, input: &WorkerInput) -> WorkerOutput {
         match input {
-            WorkerInput::Init => {
-                let cities = match load_embedded_cities() {
+            WorkerInput::Init { weather_bundle } => {
+                let cities = match load_cities_from_bundle(weather_bundle) {
                     Ok(c) => c,
                     Err(message) => {
                         return WorkerOutput::Error { message };
@@ -88,10 +88,19 @@ mod tests {
     use crate::event::AppEvent;
     use crate::geometry::wire_byte_len;
 
+    use crate::data::weather_bundle_path;
+
+    fn init_input() -> WorkerInput {
+        let bundle = std::fs::read(weather_bundle_path()).expect("weather bundle");
+        WorkerInput::Init {
+            weather_bundle: bundle,
+        }
+    }
+
     #[test]
     fn init_is_fast_no_render_effect() {
         let mut engine = Engine::new();
-        let out = engine.dispatch(&WorkerInput::Init);
+        let out = engine.dispatch(&init_input());
         match out {
             WorkerOutput::Initialized { effects, .. } => assert!(effects.is_empty()),
             other => panic!("expected initialized, got {other:?}"),
@@ -101,7 +110,7 @@ mod tests {
     #[test]
     fn request_frame_plans_render_spiral_effect() {
         let mut engine = Engine::new();
-        let _ = engine.dispatch(&WorkerInput::Init);
+        let _ = engine.dispatch(&init_input());
         let out = engine.dispatch(&WorkerInput::Event {
             event: AppEvent::RequestFrame,
         });

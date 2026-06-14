@@ -139,8 +139,7 @@ impl AppState {
     pub fn initial(cities: Vec<CityWeather>) -> Self {
         let selected_city_id = cities
             .first()
-            .map(|c| c.id.clone())
-            .unwrap_or_else(|| "bristol".to_string());
+            .map_or_else(|| "bristol".to_string(), |c| c.id.clone());
         Self {
             cities,
             selected_city_id,

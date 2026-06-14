@@ -12,7 +12,13 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum WorkerInput {
-    Init,
+    Init {
+        #[serde(rename = "weatherBundle")]
+        #[cfg_attr(feature = "typegen", ts(rename = "weatherBundle"))]
+        #[serde(with = "serde_bytes")]
+        #[cfg_attr(feature = "typegen", ts(type = "Uint8Array"))]
+        weather_bundle: Vec<u8>,
+    },
     Event { event: AppEvent },
 }
 

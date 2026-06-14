@@ -18,7 +18,9 @@ pub fn is_daylight_hour(series: &MetricSeries, index: u32) -> bool {
 pub fn count_daylight_hours(series: &MetricSeries) -> u32 {
     (0..series.hour_count())
         .filter(|&i| is_daylight_hour(series, i))
-        .count() as u32
+        .count()
+        .try_into()
+        .unwrap_or(u32::MAX)
 }
 
 /// First and last lit hour-of-day (0–23) for a calendar day index, if any.
@@ -67,15 +69,15 @@ mod tests {
                     Vec::new()
                 }
             }),
-            values.len() as u32,
+            values.len().try_into().expect("test series length"),
         )
     }
 
     #[test]
     fn day_window_finds_lit_span() {
         let mut hours = vec![0.0; 48];
-        for h in 8..18 {
-            hours[h] = 100.0;
+        for h in hours.iter_mut().take(18).skip(8) {
+            *h = 100.0;
         }
         let series = series_with_sunlight(&hours);
         let w = day_window(&series, 0).expect("day 0");

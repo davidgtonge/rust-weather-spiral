@@ -151,8 +151,8 @@ export function createWeatherWorkerClient(
   };
 }
 
-export function weatherInitInput(): WorkerInput {
-  return { kind: "init" };
+export function weatherInitInput(weatherBundle: Uint8Array): WorkerInput {
+  return { kind: "init", weatherBundle };
 }
 
 export function weatherEventInput(event: AppEvent): WorkerInput {

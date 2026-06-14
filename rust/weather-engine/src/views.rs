@@ -6,6 +6,7 @@ use crate::draw::{
     push_condition_view, push_glyphs, push_sky_only, push_tapestry_layers, DrawWriter, SegmentDraw,
     SegmentPose, FLAG_BRIGHT, FLAG_STORM,
 };
+use crate::num::{f32_from_u32, f32_from_usize, u8_from_alpha, u8_from_f32_rounded};
 use crate::spiral::{
     daylight_layout, daylight_point, fingerprint_layout, fingerprint_point, layout_ctx,
     layout_point, layout_segment_size, mandala_layout, mandala_point, ribbon_track_offset,
@@ -44,7 +45,7 @@ fn norm(value: f32, metric: Metric) -> f32 {
 }
 
 fn scale_u8(value: f32, metric: Metric) -> u8 {
-    (norm(value, metric) * 255.0).round() as u8
+    u8_from_f32_rounded(norm(value, metric) * 255.0)
 }
 
 fn sky_rgba(sunlight: f32, cloud: f32) -> Rgba {
@@ -56,14 +57,14 @@ fn sky_rgba(sunlight: f32, cloud: f32) -> Rgba {
         r: lerp_u8(mix, r, CLOUD_GREY.0),
         g: lerp_u8(mix, g, CLOUD_GREY.1),
         b: lerp_u8(mix, b, CLOUD_GREY.2),
-        a: (255.0 * (1.0 - cloud_t * 0.45)) as u8,
+        a: u8_from_alpha(1.0 - cloud_t * 0.45),
     }
 }
 
 fn lerp_u8(t: f32, a: u8, b: u8) -> u8 {
     let af = f32::from(a);
     let bf = f32::from(b);
-    (af + (bf - af) * t).round() as u8
+    u8_from_f32_rounded(af + (bf - af) * t)
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -255,8 +256,8 @@ fn build_tapestry(
     push_tapestry_layers(
         writer,
         ViewMode::Tapestry,
-        canvas_size as f32,
-        canvas_size as f32,
+        f32_from_u32(canvas_size),
+        f32_from_u32(canvas_size),
         seg_w,
         seg_h,
         &segments,
@@ -282,7 +283,7 @@ fn build_ribbon(
     for i in 0..hour_count {
         let (x, y, angle) = layout_point(&ctx, hour_step, i);
         for (track, &metric) in metrics.iter().enumerate() {
-            let (ox, oy) = ribbon_track_offset(x, y, angle, track as f32, seg_w);
+            let (ox, oy) = ribbon_track_offset(x, y, angle, f32_from_usize(track), seg_w);
             let value = read_f32_le(series.bytes(metric), i);
             let rgba = colour_for(metric, value);
             segments.push(SegmentDraw {
@@ -382,7 +383,7 @@ fn build_mandala(
 
     for i in 0..hour_count {
         let w = WeatherSample::from_series(series, i);
-        let t = ctx.extent_start + i as f32 * hour_step as f32;
+        let t = ctx.extent_start + f32_from_u32(i) * f32_from_u32(hour_step);
         let (x, y, angle) = mandala_point(&layout, t, ctx.extent_start, hour_step);
         segments.push(weather_segment(x, y, angle, sky_rgba(w.sunlight, w.cloud), &w));
     }
@@ -390,8 +391,8 @@ fn build_mandala(
     push_tapestry_layers(
         writer,
         ViewMode::Mandala,
-        canvas_size as f32,
-        canvas_size as f32,
+        f32_from_u32(canvas_size),
+        f32_from_u32(canvas_size),
         layout.seg_w,
         layout.seg_h,
         &segments,
@@ -412,7 +413,7 @@ fn build_fingerprint(
 
     for i in 0..hour_count {
         let w = WeatherSample::from_series(series, i);
-        let t = ctx.extent_start + i as f32 * hour_step as f32;
+        let t = ctx.extent_start + f32_from_u32(i) * f32_from_u32(hour_step);
         let (x, y, angle) = fingerprint_point(&layout, t, ctx.extent_start, hour_step);
         segments.push(weather_segment(x, y, angle, sky_rgba(w.sunlight, w.cloud), &w));
     }
@@ -420,8 +421,8 @@ fn build_fingerprint(
     push_tapestry_layers(
         writer,
         ViewMode::Fingerprint,
-        canvas_size as f32,
-        canvas_size as f32,
+        f32_from_u32(canvas_size),
+        f32_from_u32(canvas_size),
         layout.seg_w,
         layout.seg_h,
         &segments,
@@ -444,15 +445,15 @@ fn build_daylight(writer: &mut DrawWriter, series: &MetricSeries, canvas_size: u
         };
 
         let w = WeatherSample::from_series(series, i);
-        let (x, y, angle) = daylight_point(&layout, day as f32, hour_of_day as f32, window);
+        let (x, y, angle) = daylight_point(&layout, f32_from_u32(day), f32_from_u32(hour_of_day), window);
         segments.push(weather_segment(x, y, angle, sky_rgba(w.sunlight, w.cloud), &w));
     }
 
     push_tapestry_layers(
         writer,
         ViewMode::Daylight,
-        canvas_size as f32,
-        canvas_size as f32,
+        f32_from_u32(canvas_size),
+        f32_from_u32(canvas_size),
         layout.seg_w,
         layout.seg_h,
         &segments,
@@ -469,7 +470,7 @@ mod tests {
         let blob: Vec<u8> = values.iter().flat_map(|v| v.to_le_bytes()).collect();
         MetricSeries::new(
             std::array::from_fn(|idx| if idx == 0 { blob.clone() } else { Vec::new() }),
-            values.len() as u32,
+            values.len().try_into().expect("test series length"),
         )
     }
 
@@ -492,7 +493,10 @@ mod tests {
 
     fn full_series(values: &[f32]) -> MetricSeries {
         let blob: Vec<u8> = values.iter().flat_map(|v| v.to_le_bytes()).collect();
-        MetricSeries::new(std::array::from_fn(|_| blob.clone()), values.len() as u32)
+        MetricSeries::new(
+            std::array::from_fn(|_| blob.clone()),
+            values.len().try_into().expect("test series length"),
+        )
     }
 
     #[test]

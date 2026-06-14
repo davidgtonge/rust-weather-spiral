@@ -1,6 +1,7 @@
 //! Compact draw-command wire for Canvas2D — Rust owns geometry; TS executes ops.
 
 use crate::draw::{DrawWriter, wire_byte_len as draw_wire_byte_len, CMD_BYTES};
+use crate::num::f32_from_u32;
 use crate::state::{Metric, MetricSeries, Zoom};
 use crate::view_mode::ViewMode;
 use crate::views::{build_view_geometry, segment_count};
@@ -8,12 +9,11 @@ use crate::views::{build_view_geometry, segment_count};
 /// One draw command per wire entry (legacy name kept for TS contract docs).
 pub const BYTES_PER_SEGMENT: usize = CMD_BYTES;
 
+const _: () = assert!(BYTES_PER_SEGMENT == CMD_BYTES);
+
 pub fn wire_byte_len(command_count: u32) -> usize {
     draw_wire_byte_len(command_count)
 }
-
-#[allow(dead_code)]
-pub const GEOMETRY_HEADER: usize = crate::draw::HEADER_LEN;
 
 pub fn build_geometry_wire(
     series: &MetricSeries,
@@ -37,19 +37,23 @@ pub fn build_geometry_wire(
         zoom,
         canvas_size,
     );
-    writer.finish(
+    let wire = writer.finish(
         mode,
         playhead_index,
-        canvas_size as f32,
-        canvas_size as f32,
-    )
+        f32_from_u32(canvas_size),
+        f32_from_u32(canvas_size),
+    );
+    let count = u32::from_le_bytes(wire[0..4].try_into().expect("draw header"));
+    assert_eq!(wire.len(), wire_byte_len(count));
+    wire
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::data::load_embedded_cities;
+    use crate::data::load_test_cities;
     use crate::draw::{DrawWriter, FL_CANVAS_SPACE, HEADER_LEN, OP_FILL_CIRCLE};
+    use crate::num::f32_from_u32;
     use crate::spiral::mandala_layout;
     use crate::spiral::{daylight_layout, daylight_point, ring_edge_pad, ring_overlay_scale};
     use crate::state::{Metric, MetricSeries, Zoom, FRAME_SIZE};
@@ -60,18 +64,21 @@ mod tests {
         let blob: Vec<u8> = values.iter().flat_map(|v| v.to_le_bytes()).collect();
         MetricSeries::new(
             std::array::from_fn(|idx| if idx == 0 { blob.clone() } else { Vec::new() }),
-            values.len() as u32,
+            values.len().try_into().expect("test series length"),
         )
     }
 
     fn full_series(values: &[f32]) -> MetricSeries {
         let blob: Vec<u8> = values.iter().flat_map(|v| v.to_le_bytes()).collect();
-        MetricSeries::new(std::array::from_fn(|_| blob.clone()), values.len() as u32)
+        MetricSeries::new(
+            std::array::from_fn(|_| blob.clone()),
+            values.len().try_into().expect("test series length"),
+        )
     }
 
     #[test]
     fn geometry_wire_size_matches_command_count() {
-        let series = series_with_values(&(0..100).map(|i| i as f32).collect::<Vec<_>>());
+        let series = series_with_values(&(0..100u32).map(f32_from_u32).collect::<Vec<_>>());
         let wire = build_geometry_wire(
             &series,
             Metric::Cloud,
@@ -100,7 +107,7 @@ mod tests {
             750,
             1,
         );
-        assert_eq!(f32::from_le_bytes(wire[4..8].try_into().unwrap()), 750.0);
+        assert!((f32::from_le_bytes(wire[4..8].try_into().unwrap()) - 750.0).abs() < f32::EPSILON);
         assert_eq!(u32::from_le_bytes(wire[12..16].try_into().unwrap()), 1);
         assert_eq!(
             u32::from_le_bytes(wire[16..20].try_into().unwrap()),
@@ -159,10 +166,10 @@ mod tests {
     #[test]
     fn daylight_geometry_in_bounds_all_cities() {
         let canvas = FRAME_SIZE;
-        let cities = load_embedded_cities().expect("cities");
+        let cities = load_test_cities();
         let layout = daylight_layout(canvas);
         let margin = 2.0_f32;
-        let half = canvas as f32 * 0.5;
+        let half = f32_from_u32(canvas) * 0.5;
         let max_anchor = half - ring_edge_pad(layout.seg_w, layout.seg_h, canvas, true);
         assert!(
             max_anchor / half >= 0.93,
@@ -195,8 +202,8 @@ mod tests {
                 };
                 let (x, y, angle) = daylight_point(
                     &layout,
-                    day as f32,
-                    hour_of_day as f32,
+                    f32_from_u32(day),
+                    f32_from_u32(hour_of_day),
                     window,
                 );
                 let (cos, sin) = angle.sin_cos();
@@ -212,8 +219,8 @@ mod tests {
                 assert!(
                     min_x >= margin
                         && min_y >= margin
-                        && max_x <= canvas as f32 - margin
-                        && max_y <= canvas as f32 - margin,
+                        && max_x <= f32_from_u32(canvas) - margin
+                        && max_y <= f32_from_u32(canvas) - margin,
                     "{} segment {} bbox [{min_x},{min_y}]-[{max_x},{max_y}]",
                     city.id,
                     i
@@ -226,11 +233,11 @@ mod tests {
 
     #[test]
     fn mandala_wire_spans_all_quadrants() {
-        let cities = load_embedded_cities().expect("cities");
+        let cities = load_test_cities();
         let city = cities.first().expect("city");
         let canvas = FRAME_SIZE;
         let layout = mandala_layout(canvas);
-        let center = canvas as f32 * 0.5;
+        let center = f32_from_u32(canvas) * 0.5;
         let mut quads = [0usize; 4];
 
         for i in 0..city.metrics.hour_count() {
@@ -241,7 +248,7 @@ mod tests {
                 canvas,
                 Zoom::Year,
             );
-            let t = ctx.extent_start + i as f32 * city.hour_step as f32;
+            let t = ctx.extent_start + f32_from_u32(i) * f32_from_u32(city.hour_step);
             let (x, y, _) = crate::spiral::mandala_point(&layout, t, ctx.extent_start, city.hour_step);
             let quad = usize::from(x >= center) + usize::from(y < center) * 2;
             quads[quad] += 1;

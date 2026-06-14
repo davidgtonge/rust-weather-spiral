@@ -1,9 +1,9 @@
+#[cfg(test)]
+use std::path::PathBuf;
+
 use serde::Deserialize;
 
 use crate::state::{CityWeather, Metric, MetricSeries, HOUR_STEP};
-
-/// Embedded CBOR bundle — built by `npm run build:weather-cbor`.
-const WEATHER_BUNDLE: &[u8] = include_bytes!("../../../data/weather.bundle.cbor");
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,24 +32,29 @@ struct CityBundleFile {
     temperature: Vec<u8>,
 }
 
-pub fn load_embedded_cities() -> Result<Vec<CityWeather>, String> {
-    let bundle: WeatherBundleFile =
-        ciborium::from_reader(WEATHER_BUNDLE).map_err(|e| format!("cbor bundle: {e}"))?;
+#[cfg(test)]
+pub fn weather_bundle_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../data/weather.bundle.cbor")
+}
 
-    if bundle.version != 1 {
-        return Err(format!("unsupported bundle version {}", bundle.version));
+pub fn load_cities_from_bundle(bundle: &[u8]) -> Result<Vec<CityWeather>, String> {
+    let parsed: WeatherBundleFile =
+        ciborium::from_reader(bundle).map_err(|e| format!("cbor bundle: {e}"))?;
+
+    if parsed.version != 1 {
+        return Err(format!("unsupported bundle version {}", parsed.version));
     }
-    if bundle.hour_step != HOUR_STEP {
+    if parsed.hour_step != HOUR_STEP {
         return Err(format!(
             "hourStep mismatch: {} (expected {HOUR_STEP})",
-            bundle.hour_step
+            parsed.hour_step
         ));
     }
 
-    bundle
+    parsed
         .cities
         .into_iter()
-        .map(|city| parse_city_bundle(city, bundle.hour_step))
+        .map(|city| parse_city_bundle(city, parsed.hour_step))
         .collect()
 }
 
@@ -88,14 +93,24 @@ fn parse_city_bundle(city: CityBundleFile, hour_step: u32) -> Result<CityWeather
 }
 
 #[cfg(test)]
+pub fn load_test_cities() -> Vec<CityWeather> {
+    let bytes = std::fs::read(weather_bundle_path()).unwrap_or_else(|e| {
+        panic!(
+            "weather.bundle.cbor: {e} — run `npm run build:weather-cbor` from the project root"
+        )
+    });
+    load_cities_from_bundle(&bytes).expect("parse weather bundle")
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::state::read_f32_le;
     use std::time::Instant;
 
     #[test]
-    fn embedded_cbor_loads_four_cities() {
-        let cities = load_embedded_cities().expect("embedded cbor");
+    fn bundle_loads_four_cities() {
+        let cities = load_test_cities();
         assert_eq!(cities.len(), 4);
         let bristol = cities.iter().find(|c| c.id == "bristol").expect("bristol");
         assert_eq!(bristol.metrics.hour_count(), 8784);
@@ -105,14 +120,14 @@ mod tests {
 
     #[test]
     fn cbor_load_under_100ms() {
+        let bytes = std::fs::read(weather_bundle_path()).expect("weather.bundle.cbor");
         let start = Instant::now();
-        let cities = load_embedded_cities().expect("load");
+        let cities = load_cities_from_bundle(&bytes).expect("load");
         assert_eq!(cities.len(), 4);
         let elapsed = start.elapsed();
         assert!(
             elapsed.as_millis() < 100,
-            "load took {:?} (budget 100ms)",
-            elapsed
+            "load took {elapsed:?} (budget 100ms)"
         );
     }
 }
